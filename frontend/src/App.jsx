@@ -1,74 +1,64 @@
-import React, { createContext, useState, useEffect } from 'react'
+import React from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import axios from "./api/axios"
-
 
 import Home from './pages/Home'
 import Register from './pages/auth/Register'
 import Login from './pages/auth/Login'
-import Profile from './pages/user/Profile'   
+import Profile from './pages/user/Profile'
 
-export const AuthContext = createContext()
+// Protected routes
+import ProtectedRoute from './components/ProtectedRoute'
+
+// (пока заглушки — потом создадим)
+import ArtistDashboard from './pages/artist/ArtistDashboard'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import Gallery from './pages/gallery/Gallery'
 
 function App() {
-  const [auth, setAuth] = useState({
-    isAuthenticated: false,
-    name: '',
-    loading: true
-  })
-
-  // Checking authorization when loading
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await axios.get('http://localhost:8081/', {
-          withCredentials: true
-        })
-
-        if (res.data.status === 'Success') {
-          setAuth({
-            isAuthenticated: true,
-            name: res.data.name,
-            loading: false
-          })
-        } else {
-          setAuth({ isAuthenticated: false, name: '', loading: false })
-        }
-      } catch (err) {
-        console.error('Auth check error:', err)
-        setAuth({ isAuthenticated: false, name: '', loading: false })
-      }
-    }
-
-    checkAuth()
-  }, [])
-
-  // logout
-  const handleLogout = async (navigate) => {
-    try {
-      await axios.post(
-        'http://localhost:8081/logout',
-        {},
-        { withCredentials: true }
-      )
-      setAuth({ isAuthenticated: false, name: '', loading: false })
-      navigate('/login')
-    } catch (err) {
-      console.error('Logout error:', err)
-    }
-  }
-
   return (
-    <AuthContext.Provider value={{ auth, setAuth, handleLogout }}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthContext.Provider>
+    <BrowserRouter>
+      <Routes>
+
+        {/* Public routes */}
+        <Route path="/" element={<Home />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<Login />} />
+
+        {/* Gallery (можно открыть всем или только авторизованным — решишь позже) */}
+        <Route path="/gallery" element={<Gallery />} />
+
+        {/* Profile (любой залогиненный пользователь) */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute allowedRoles={['buyer', 'artist', 'admin']}>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Artist panel */}
+        <Route
+          path="/artist"
+          element={
+            <ProtectedRoute allowedRoles={['artist']}>
+              <ArtistDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin panel */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+      </Routes>
+    </BrowserRouter>
   )
 }
 

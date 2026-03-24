@@ -1,76 +1,55 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import axios from "../api/axios";
 
 function Home() {
-  const [auth, setAuth] = useState(false);
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [showMessage, setShowMessage] = useState(true);
-  const [fadeOut, setFadeOut] = useState(false);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await axios.get("/");
-        if (res.data?.status === "Success") {
-          setAuth(true);
-          setName(res.data.name);
-        } else {
-          setAuth(false);
-        }
-      } catch (err) {
-        setAuth(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
-
-
-  useEffect(() => {
-    if (!loading) {
-      const timer = setTimeout(() => {
-        setFadeOut(true);
-        
-        const hideTimer = setTimeout(() => {
-          setShowMessage(false);
-        }, 500);
-
-        return () => clearTimeout(hideTimer);
-      }, 5000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [loading]);
-
-  if (loading) return <div className="home-loading">Loading...</div>;
+  const token = localStorage.getItem("token");
+  const role = localStorage.getItem("role");
 
   return (
     <div className="home-container">
-      {showMessage && (
-        <div className={`home-message ${fadeOut ? 'fade-out' : 'fade-in'}`}>
-          {auth ? (
-            <div className="welcome-message">
-              <h3>Welcome, {name}!</h3>
-              <p>You are logged in.</p>
-              <Link to="/profile" className="home-btn">
-                Go to Profile
+      <div className="home-message">
+
+        {token ? (
+          <div className="welcome-message">
+            <h3>Welcome back!</h3>
+
+            <Link to="/gallery" className="home-btn">
+              Go to Gallery
+            </Link>
+
+            <Link to="/profile" className="home-btn">
+              My Profile
+            </Link>
+
+            {role === "artist" && (
+              <Link to="/artist" className="home-btn">
+                Artist Dashboard
               </Link>
-            </div>
-          ) : (
-            <div className="unauthorized-message">
-              <h3>You are not authorized</h3>
-              <p>Please log in to continue</p>
-              <Link to="/login" className="home-btn login-btn">
-                Login
+            )}
+
+            {role === "admin" && (
+              <Link to="/admin" className="home-btn">
+                Admin Panel
               </Link>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+
+          </div>
+        ) : (
+          <div className="unauthorized-message">
+            <h3>Welcome to Digital Art Gallery</h3>
+            <p>Discover and purchase unique artworks</p>
+
+            <Link to="/login" className="home-btn login-btn">
+              Login
+            </Link>
+
+            <Link to="/register" className="home-btn">
+              Register
+            </Link>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }
