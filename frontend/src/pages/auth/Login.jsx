@@ -1,44 +1,35 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import axios from "../../api/axios";
+import api from '../../api/axios'
 
 function Login() {
-  const [values, setValues] = useState({
-    email: '',
-    password: ''
-  })
-
+  const [values, setValues] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
   const navigate = useNavigate()
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
+  const handleSubmit = async (e) => {
+    e.preventDefault()
     setError('')
-    setLoading(true)
 
-    // Basic validation
     if (!values.email || !values.password) {
       setError('Please fill in all fields')
-      setLoading(false)
       return
     }
 
+    setLoading(true)
     try {
-      // Send login request
-      const res = await axios.post('/login', values)
+      // Cookie устанавливается автоматически (withCredentials: true)
+      const res = await api.post('/login', values)
 
-      if (res.data.status === "Success") {
+      if (res.data.status === 'Success') {
+        const { role, name } = res.data
 
-        // Save token and role
-        const token = res.data.token
-        const role = res.data.role
-
-        localStorage.setItem('token', token)
+        // Храним role и name в localStorage только для UI-решений
+        // (показывать/скрывать кнопки). Защита идёт через httpOnly cookie.
         localStorage.setItem('role', role)
+        localStorage.setItem('name', name)
 
-        // Redirect based on role
         if (role === 'admin') {
           navigate('/admin')
         } else if (role === 'artist') {
@@ -46,14 +37,11 @@ function Login() {
         } else {
           navigate('/gallery')
         }
-
       } else {
-        setError(res.data.error || "Invalid credentials")
+        setError(res.data.error || 'Invalid credentials')
       }
-
     } catch (err) {
-      console.error("Login request error:", err)
-      setError("Server error — please try again later")
+      setError(err.response?.data?.error || 'Server error — please try again later')
     } finally {
       setLoading(false)
     }
@@ -70,37 +58,32 @@ function Login() {
           <div className='mb-3'>
             <label><strong>Email</strong></label>
             <input
-              type="email"
+              type='email'
               placeholder='Enter Email'
-              onChange={e => setValues({ ...values, email: e.target.value })}
               className='form-control'
+              value={values.email}
+              onChange={e => setValues({ ...values, email: e.target.value })}
             />
           </div>
 
           <div className='mb-3'>
             <label><strong>Password</strong></label>
             <input
-              type="password"
+              type='password'
               placeholder='Enter Password'
-              onChange={e => setValues({ ...values, password: e.target.value })}
               className='form-control'
+              value={values.password}
+              onChange={e => setValues({ ...values, password: e.target.value })}
             />
           </div>
 
-          <button 
-            type='submit' 
-            className='btn-login'
-            disabled={loading}
-          >
+          <button type='submit' className='btn-login' disabled={loading}>
             {loading ? 'Loading...' : 'Log in'}
           </button>
 
           <div className='register-link-container'>
             <p className='register-text'>Don't have an account yet?</p>
-
-            <Link to="/register" className='register-link'>
-              Create Account
-            </Link>
+            <Link to='/register' className='register-link'>Create Account</Link>
           </div>
         </form>
       </div>

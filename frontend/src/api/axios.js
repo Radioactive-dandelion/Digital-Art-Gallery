@@ -1,24 +1,27 @@
-import axios from "axios";
+import axios from 'axios'
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8081",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+const config = {
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+}
 
-// 🔥 Add JWT token to every request
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
+// User Service — аутентификация, профиль
+export const userApi = axios.create({
+  baseURL: import.meta.env.VITE_USER_SERVICE_URL || 'http://localhost:8081',
+  ...config,
+})
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+// Product Service — галерея, загрузка работ
+export const productApi = axios.create({
+  baseURL: import.meta.env.VITE_PRODUCT_SERVICE_URL || 'http://localhost:8082',
+  ...config,
+})
 
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+// Order Service — корзина, заказы, вишлист
+export const orderApi = axios.create({
+  baseURL: import.meta.env.VITE_ORDER_SERVICE_URL || 'http://localhost:8083',
+  ...config,
+})
 
-export default api;
+// Дефолтный экспорт для обратной совместимости (старые файлы которые ещё не обновлены)
+export default userApi

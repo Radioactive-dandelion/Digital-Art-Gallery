@@ -1,57 +1,44 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React from 'react'
+import { Link } from 'react-router-dom'
 
 function Home() {
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
+  const role = localStorage.getItem('role')
+  const name = localStorage.getItem('name')
 
   return (
-    <div className="home-container">
-      <div className="home-message">
+    <div className='home-container'>
+      <div className='home-message'>
 
-        {token ? (
-          <div className="welcome-message">
-            <h3>Welcome back!</h3>
+        {role ? (
+          <div className='welcome-message'>
+            <h3>Welcome back{name ? `, ${name}` : ''}!</h3>
+            <p>What would you like to do today?</p>
 
-            <Link to="/gallery" className="home-btn">
-              Go to Gallery
-            </Link>
+            <Link to='/gallery' className='home-btn'>Go to Gallery</Link>
+            <Link to='/wishlist' className='home-btn'>My Wishlist</Link>
+            <Link to='/orders'   className='home-btn'>My Orders</Link>
+            <Link to='/profile'  className='home-btn'>My Profile</Link>
 
-            <Link to="/profile" className="home-btn">
-              My Profile
-            </Link>
-
-            {role === "artist" && (
-              <Link to="/artist" className="home-btn">
-                Artist Dashboard
-              </Link>
+            {role === 'artist' && (
+              <Link to='/artist' className='home-btn'>Artist Dashboard</Link>
             )}
-
-            {role === "admin" && (
-              <Link to="/admin" className="home-btn">
-                Admin Panel
-              </Link>
+            {role === 'admin' && (
+              <Link to='/admin' className='home-btn'>Admin Panel</Link>
             )}
-
           </div>
         ) : (
-          <div className="unauthorized-message">
+          <div className='unauthorized-message'>
             <h3>Welcome to Digital Art Gallery</h3>
-            <p>Discover and purchase unique artworks</p>
-
-            <Link to="/login" className="home-btn login-btn">
-              Login
-            </Link>
-
-            <Link to="/register" className="home-btn">
-              Register
-            </Link>
+            <p>Discover and purchase unique digital artworks</p>
+            <Link to='/login'    className='home-btn'>Login</Link>
+            <Link to='/register' className='home-btn'>Register</Link>
+            <Link to='/gallery'  className='home-btn'>Browse Gallery</Link>
           </div>
         )}
 
       </div>
     </div>
-  );
+  )
 }
 
-export default Home;
+export default Home

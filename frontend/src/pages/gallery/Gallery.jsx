@@ -1,70 +1,137 @@
-import React, { useEffect, useState } from "react";
-import axios from "../api/axios";
+import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { productApi, orderApi } from '../../api/axios'
 
 function Gallery() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [products, setProducts]   = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
+  const [category, setCategory]   = useState('all')
+  const [search, setSearch]       = useState('')
+  const navigate = useNavigate()
+  const isLoggedIn = !!localStorage.getItem('role')
+
+  const CATEGORIES = ['all', 'painting', 'digital', 'photography', 'illustration']
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
+    productApi.get('/products')
+      .then(res => setProducts(res.data || []))
+      .catch(() => setError('Failed to load artworks'))
+      .finally(() => setLoading(false))
+  }, [])
 
-        const res = await axios.get("/products");
+  const handleAddToWishlist = async (productId) => {
+    if (!isLoggedIn) return navigate('/login')
+    try {
+      await orderApi.post('/wishlist', { product_id: productId })
+    } catch (err) {
+      console.error('Wishlist error:', err)
+    }
+  }
 
-        setProducts(res.data || []);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load artworks");
-      } finally {
-        setLoading(false);
-      }
-    };
+  const handleAddToCart = async (productId) => {
+    if (!isLoggedIn) return navigate('/login')
+    try {
+      await orderApi.post('/cart', { product_id: productId, quantity: 1 })
+      navigate('/cart')
+    } catch (err) {
+      console.error('Cart error:', err)
+    }
+  }
 
-    fetchProducts();
-  }, []);
+  const filtered = products.filter(p => {
+    const matchCat = category === 'all' || p.category === category
+    const matchSearch = p.title?.toLowerCase().includes(search.toLowerCase())
+      || p.artist?.toLowerCase().includes(search.toLowerCase())
+    return matchCat && matchSearch
+  })
 
-  if (loading) return <div>Loading gallery...</div>;
+  if (loading) return <div className='loading-indicator'>Loading gallery...</div>
 
   return (
-    <div className="gallery-container">
-      <h2>Art Gallery</h2>
-
-      {error && <div className="error">{error}</div>}
-
-      <div className="gallery-grid">
-        {products.map(product => (
-          <div className="gallery-card" key={product.id}>
-
-            {/* Image */}
-            {product.image ? (
-              <img
-                src={product.image}
-                alt={product.title}
-                className="gallery-image"
-              />
-            ) : (
-              <div className="image-placeholder">No Image</div>
-            )}
-
-            {/* Info */}
-            <h4>{product.title}</h4>
-            <p>${product.price}</p>
-            <p className="artist-name">
-              by {product.artist || "Unknown"}
-            </p>
-
-            {/* Action */}
-            <button className="btn btn-primary">
-              View
-            </button>
-
-          </div>
+    <div className='page'>
+      {/* Category bar */}
+      <div className='category-bar'>
+        {CATEGORIES.map(cat => (
+          <button
+            key={cat}
+            className={`category-pill${category === cat ? ' active' : ''}`}
+            onClick={() => setCategory(cat)}
+          >
+            {cat === 'all' ? 'All Works' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
         ))}
       </div>
+
+      <div className='layout'>
+        {/* Sidebar filters */}
+        <div className='sidebar'>
+          <div className='sidebar-title'>Search</div>
+          <input
+            className='search-input'
+            placeholder='Title or artist...'
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', marginBottom: '1.5rem' }}
+          />
+          <div className='sidebar-title'>Sort</div>
+          <select className='sort-select'>
+            <option>Newest</option>
+            <option>Price: Low to High</option>
+            <option>Price: High to Low</option>
+          </select>
+        </div>
+
+        {/* Grid */}
+        <div>
+          <div className='content-header'>
+            <span className='page-title'>Gallery</span>
+            <span className='subtitle'>{filtered.length} works</span>
+          </div>
+
+          {error && <div className='status error'>{error}</div>}
+
+          {filtered.length === 0 && !error && (
+            <div className='status'>No artworks found</div>
+          )}
+
+          <div className='products-grid'>
+            {filtered.map(product => (
+              <div className='product-card' key={product.id}>
+                <div
+                  className='product-image-wrap'
+                  onClick={() => navigate(`/gallery/${product.id}`)}
+                >
+                  {product.image
+                    ? <img src={product.image} alt={product.title} className='product-image' />
+                    : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontSize: '0.8rem' }}>No image</div>
+                  }
+                </div>
+                <div className='product-info'>
+                  <div className='product-brand'>{product.artist || 'Unknown artist'}</div>
+                  <div className='product-name'>{product.title}</div>
+                  <div className='product-price'>${product.price}</div>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <button className='primary-button' style={{ flex: 1, marginTop: 0 }}
+                      onClick={() => handleAddToCart(product.id)}>
+                      Add to Cart
+                    </button>
+                    <button
+                      onClick={() => handleAddToWishlist(product.id)}
+                      style={{ background: 'none', border: '1px solid #ddd', padding: '0.4rem 0.6rem', cursor: 'pointer' }}
+                      title='Add to wishlist'
+                    >
+                      ♡
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
 
-export default Gallery;
+export default Gallery
