@@ -1,29 +1,45 @@
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql import func
 
-from .database import Base  # adjust path if needed
+from .database import Base
 
 
-class Product(Base):
-    __tablename__ = "products"
+class Artwork(Base):
+    """
+    Основная модель — произведение искусства.
+    artist_id ссылается на users.id в User Service (межсервисная связь).
+    """
+    __tablename__ = "artworks"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id          = Column(Integer, primary_key=True, index=True)
+    title       = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    price       = Column(Numeric(10, 2), nullable=False)
 
-    name = Column(String(255), nullable=False)
-    description = Column(String, nullable=True)
-    price = Column(Numeric(10, 2), nullable=False)
-    category = Column(String(100), nullable=True)
-    url = Column(String(255), nullable=True)
-    size = Column(String(50), nullable=True)
-    color = Column(String(50), nullable=True)
-    sku = Column(String(100), nullable=True)
-    images = Column(JSONB, nullable=True)  # list of image URLs
-    stock = Column(Integer, nullable=True)
-    is_active = Column(Boolean, default=True)
+    # Категория: painting, digital, photography, illustration, sculpture
+    category    = Column(String(100), nullable=True, index=True)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
+    # Техника исполнения: oil, watercolor, digital, charcoal и т.д.
+    medium      = Column(String(100), nullable=True)
+
+    # Главное изображение (путь к файлу, напр. /uploads/artworks/1-img.jpg)
+    image       = Column(String(500), nullable=True)
+
+    # Дополнительные изображения (массив URL)
+    images      = Column(JSONB, nullable=True)
+
+    # artist_id — id пользователя с ролью "artist" из User Service
+    artist_id   = Column(Integer, nullable=False, index=True)
+
+    # Имя артиста — денормализованное поле, чтобы не ходить в User Service
+    # при каждом запросе списка работ
+    artist_name = Column(String(255), nullable=True)
+
+    is_active   = Column(Boolean, default=True, nullable=False)
+
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at  = Column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),

@@ -1,137 +1,276 @@
-from ..search import index_product, delete_product_from_index, search_products_es
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+import os
+import shutil
 from typing import List, Optional
+
+from fastapi import (
+    APIRouter, Depends, HTTPException, Query,
+    UploadFile, File, Form, status, Request
+)
+from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from ..database import get_db
 from .. import models, schemas
-from ..search import search_products_es 
+from ..auth import get_current_user, require_artist, require_admin
 
-router = APIRouter(
-    prefix="/products",
-    tags=["products"],
-)
+router = APIRouter(tags=["artworks"])
 
-@router.post("/", response_model=schemas.ProductOut, status_code=status.HTTP_201_CREATED)
-def create_product(product_in: schemas.ProductCreate, db: Session = Depends(get_db)):
-    # Pydantic v2 style: model_dump()
-    product = models.Product(**product_in.model_dump())
-    db.add(product)
-    db.commit()
-    db.refresh(product)
-
-    # index in Elasticsearch
-    index_product(product)
-
-    return product
+UPLOAD_DIR = "uploads/artworks"
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "internal-secret")
 
 
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+def save_image(file: UploadFile, artwork_id: int) -> str:
+    """Сохраняет файл и возвращает путь для хранения в БД."""
+    ext = os.path.splitext(file.filename)[1].lower()
+    filename = f"{artwork_id}{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    with open(filepath, "wb") as buf:
+        shutil.copyfileobj(file.file, buf)
+    return f"/uploads/artworks/{filename}"
 
 
+def get_artwork_or_404(artwork_id: int, db: Session) -> models.Artwork:
+    artwork = db.query(models.Artwork).filter(models.Artwork.id == artwork_id).first()
+    if not artwork:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    return artwork
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  PUBLIC ROUTES
+# ══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/search", response_model=List[schemas.ProductOut])
-def search_products(
-    q: str = Query(..., description="Search text"),
-    category: Optional[str] = None,
-    db: Session = Depends(get_db),
+@router.get("/products", response_model=List[schemas.ArtworkOut])
+def list_artworks(
+    db:        Session          = Depends(get_db),
+    category:  Optional[str]   = None,
+    medium:    Optional[str]   = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    artist_id: Optional[int]   = None,
+    q:         Optional[str]   = Query(None, description="Search by title or artist name"),
+    skip:      int              = 0,
+    limit:     int              = Query(20, le=100),
 ):
-    # 1) Try Elasticsearch
-    es_ids = search_products_es(q, category)
-
-    if es_ids:  # got valid ids from ES
-        products = (
-            db.query(models.Product)
-            .filter(models.Product.id.in_(es_ids))
-            .all()
-        )
-        # keep ES ranking order
-        order = {pid: i for i, pid in enumerate(es_ids)}
-        products.sort(key=lambda p: order.get(p.id, 9999))
-        return products
-
-    # 2) Fallback: plain SQL LIKE search if ES failed / unavailable
-    pattern = f"%{q}%"
-
-    query = db.query(models.Product).filter(
-        or_(
-            models.Product.name.ilike(pattern),
-            models.Product.description.ilike(pattern),
-            models.Product.category.ilike(pattern),
-        )
-    )
+    """Публичный список работ с фильтрацией и поиском."""
+    query = db.query(models.Artwork).filter(models.Artwork.is_active == True)
 
     if category:
-        query = query.filter(models.Product.category == category)
+        query = query.filter(models.Artwork.category == category)
+    if medium:
+        query = query.filter(models.Artwork.medium == medium)
+    if min_price is not None:
+        query = query.filter(models.Artwork.price >= min_price)
+    if max_price is not None:
+        query = query.filter(models.Artwork.price <= max_price)
+    if artist_id:
+        query = query.filter(models.Artwork.artist_id == artist_id)
+    if q:
+        pattern = f"%{q}%"
+        query = query.filter(
+            or_(
+                models.Artwork.title.ilike(pattern),
+                models.Artwork.artist_name.ilike(pattern),
+                models.Artwork.description.ilike(pattern),
+            )
+        )
 
+    return query.order_by(models.Artwork.created_at.desc()).offset(skip).limit(limit).all()
+
+
+@router.get("/products/search", response_model=List[schemas.ArtworkOut])
+def search_artworks(
+    q:        str            = Query(...),
+    category: Optional[str] = None,
+    db:       Session        = Depends(get_db),
+):
+    """Поиск по тексту (отдельный endpoint для совместимости с фронтом)."""
+    pattern = f"%{q}%"
+    query = db.query(models.Artwork).filter(
+        models.Artwork.is_active == True,
+        or_(
+            models.Artwork.title.ilike(pattern),
+            models.Artwork.description.ilike(pattern),
+            models.Artwork.artist_name.ilike(pattern),
+        )
+    )
+    if category:
+        query = query.filter(models.Artwork.category == category)
     return query.all()
 
 
-@router.get("/{product_id}", response_model=schemas.ProductOut)
-def get_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return product
+@router.get("/products/{product_id}", response_model=schemas.ArtworkOut)
+def get_artwork(product_id: int, db: Session = Depends(get_db)):
+    return get_artwork_or_404(product_id, db)
 
-@router.get("/", response_model=List[schemas.ProductOut])
-def list_products(
-    db: Session = Depends(get_db),
-    category: Optional[str] = None,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None,
-    in_stock: Optional[bool] = None,
-    skip: int = 0,
-    limit: int = Query(20, le=100),
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ARTIST ROUTES — создание и управление своими работами
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/artist/products", response_model=List[schemas.ArtworkOut])
+def get_my_artworks(
+    db:   Session = Depends(get_db),
+    user: dict    = Depends(require_artist),
 ):
-    query = db.query(models.Product)
+    """Список своих работ для Artist Dashboard."""
+    return (
+        db.query(models.Artwork)
+        .filter(models.Artwork.artist_id == user["id"])
+        .order_by(models.Artwork.created_at.desc())
+        .all()
+    )
 
-    if category:
-        query = query.filter(models.Product.category == category)
-    if min_price is not None:
-        query = query.filter(models.Product.price >= min_price)
-    if max_price is not None:
-        query = query.filter(models.Product.price <= max_price)
-    if in_stock is True:
-        query = query.filter(models.Product.stock > 0)
 
-    return query.offset(skip).limit(limit).all()
+@router.post("/products", response_model=schemas.ArtworkOut, status_code=201)
+async def create_artwork(
+    title:       str             = Form(...),
+    description: Optional[str]  = Form(None),
+    price:       float           = Form(...),
+    category:    Optional[str]  = Form(None),
+    medium:      Optional[str]  = Form(None),
+    image:       Optional[UploadFile] = File(None),
+    db:          Session         = Depends(get_db),
+    user:        dict            = Depends(require_artist),
+):
+    """Создать новую работу. Принимает multipart/form-data."""
+    artwork = models.Artwork(
+        title=title,
+        description=description,
+        price=price,
+        category=category,
+        medium=medium,
+        artist_id=user["id"],
+        artist_name=user.get("name", ""),
+    )
+    db.add(artwork)
+    db.commit()
+    db.refresh(artwork)
 
-@router.put("/{product_id}", response_model=schemas.ProductOut)
-def update_product(
+    # Сохраняем изображение после получения id
+    if image and image.filename:
+        artwork.image = save_image(image, artwork.id)
+        db.commit()
+        db.refresh(artwork)
+
+    return artwork
+
+
+@router.put("/products/{product_id}", response_model=schemas.ArtworkOut)
+def update_artwork(
+    product_id:  int,
+    artwork_in:  schemas.ArtworkUpdate,
+    db:          Session = Depends(get_db),
+    user:        dict    = Depends(require_artist),
+):
+    artwork = get_artwork_or_404(product_id, db)
+
+    # Артист может редактировать только свои работы; admin — любые
+    if user["role"] != "admin" and artwork.artist_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Not your artwork")
+
+    for field, value in artwork_in.model_dump(exclude_unset=True).items():
+        setattr(artwork, field, value)
+
+    db.commit()
+    db.refresh(artwork)
+    return artwork
+
+
+@router.post("/products/{product_id}/image", response_model=schemas.ArtworkOut)
+async def upload_artwork_image(
     product_id: int,
-    product_in: schemas.ProductUpdate,
-    db: Session = Depends(get_db),
+    image:      UploadFile = File(...),
+    db:         Session    = Depends(get_db),
+    user:       dict       = Depends(require_artist),
 ):
-    product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+    """Загрузить/заменить изображение для существующей работы."""
+    artwork = get_artwork_or_404(product_id, db)
 
-    for field, value in product_in.model_dump(exclude_unset=True).items():
-        setattr(product, field, value)
+    if user["role"] != "admin" and artwork.artist_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Not your artwork")
 
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    artwork.image = save_image(image, artwork.id)
     db.commit()
-    db.refresh(product)
-
-    # re-index in ES
-    index_product(product)
-
-    return product
+    db.refresh(artwork)
+    return artwork
 
 
+@router.delete("/products/{product_id}", status_code=204)
+def delete_artwork(
+    product_id: int,
+    db:         Session = Depends(get_db),
+    user:       dict    = Depends(require_artist),
+):
+    artwork = get_artwork_or_404(product_id, db)
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+    if user["role"] != "admin" and artwork.artist_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Not your artwork")
 
-    db.delete(product)
+    # Удаляем файл изображения если есть
+    if artwork.image:
+        local_path = artwork.image.lstrip("/")
+        if os.path.exists(local_path):
+            os.remove(local_path)
+
+    db.delete(artwork)
     db.commit()
 
-    # remove from ES
-    delete_product_from_index(product_id)
 
-    return
+# ══════════════════════════════════════════════════════════════════════════════
+#  ADMIN ROUTES
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/admin/products", response_model=List[schemas.ArtworkOut])
+def admin_list_artworks(
+    db:   Session = Depends(get_db),
+    user: dict    = Depends(require_admin),
+):
+    """Все работы включая неактивные — для Admin Panel."""
+    return db.query(models.Artwork).order_by(models.Artwork.created_at.desc()).all()
+
+
+@router.delete("/admin/products/{product_id}", status_code=204)
+def admin_delete_artwork(
+    product_id: int,
+    db:         Session = Depends(get_db),
+    user:       dict    = Depends(require_admin),
+):
+    artwork = get_artwork_or_404(product_id, db)
+    if artwork.image:
+        local_path = artwork.image.lstrip("/")
+        if os.path.exists(local_path):
+            os.remove(local_path)
+    db.delete(artwork)
+    db.commit()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  INTERNAL ROUTE — для Order Service
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/internal/products/{product_id}")
+def internal_get_product(product_id: int, request: Request, db: Session = Depends(get_db)):
+    """
+    Используется Order Service для получения цены и названия товара.
+    Защищён секретным заголовком X-Internal-Secret.
+    """
+    secret = request.headers.get("x-internal-secret")
+    if secret != INTERNAL_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    artwork = get_artwork_or_404(product_id, db)
+    return {
+        "id":          artwork.id,
+        "title":       artwork.title,
+        "price":       float(artwork.price),
+        "image":       artwork.image,
+        "artist_id":   artwork.artist_id,
+        "artist_name": artwork.artist_name,
+        "is_active":   artwork.is_active,
+    }
