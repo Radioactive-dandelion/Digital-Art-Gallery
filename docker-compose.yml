@@ -1,0 +1,171 @@
+version: "3.9"
+
+services:
+
+  # ──────────────────────────────────────
+  # USER SERVICE  (Node.js + Express)
+  # ──────────────────────────────────────
+  user-service:
+    build: ./user-service/server
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    environment:
+      DB_HOST: mysql-users
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: gallery_users
+      JWT_SECRET: change-me-in-production
+      INTERNAL_SECRET: internal-secret
+      NODE_ENV: production
+    depends_on:
+      mysql-users:
+        condition: service_healthy
+    volumes:
+      - user_uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - gallery-net
+
+  # ──────────────────────────────────────
+  # PRODUCT SERVICE  (Python + FastAPI)
+  # ──────────────────────────────────────
+  product-service:
+    build: ./product-service
+    container_name: product-service
+    ports:
+      - "8082:8082"
+    environment:
+      DB_HOST: postgres-products
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: gallery_products
+      JWT_SECRET: change-me-in-production
+      INTERNAL_SECRET: internal-secret
+      USER_SERVICE_URL: http://user-service:8081
+    depends_on:
+      postgres-products:
+        condition: service_healthy
+    volumes:
+      - product_uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - gallery-net
+
+  # ──────────────────────────────────────
+  # ORDER SERVICE  (Java + Spring Boot)
+  # ──────────────────────────────────────
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    ports:
+      - "8083:8083"
+    environment:
+      DB_HOST: postgres-orders
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: gallery_orders
+      JWT_SECRET: change-me-in-production
+      INTERNAL_SECRET: internal-secret
+      USER_SERVICE_URL: http://user-service:8081
+      PRODUCT_SERVICE_URL: http://product-service:8082
+    depends_on:
+      postgres-orders:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - gallery-net
+
+  # ──────────────────────────────────────
+  # FRONTEND  (React + Vite)
+  # ──────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "5173:80"
+    environment:
+      VITE_USER_SERVICE_URL: http://localhost:8081
+      VITE_PRODUCT_SERVICE_URL: http://localhost:8082
+      VITE_ORDER_SERVICE_URL: http://localhost:8083
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+    restart: unless-stopped
+    networks:
+      - gallery-net
+
+  # ──────────────────────────────────────
+  # MySQL — для User Service
+  # ──────────────────────────────────────
+  mysql-users:
+    image: mysql:8.0
+    container_name: mysql-users
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: gallery_users
+    volumes:
+      - mysql_users_data:/var/lib/mysql
+      - ./user-service/server/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gallery-net
+
+  # ──────────────────────────────────────
+  # PostgreSQL — для Product Service
+  # ──────────────────────────────────────
+  postgres-products:
+    image: postgres:16-alpine
+    container_name: postgres-products
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gallery_products
+    volumes:
+      - pg_products_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gallery-net
+
+  # ──────────────────────────────────────
+  # PostgreSQL — для Order Service
+  # ──────────────────────────────────────
+  postgres-orders:
+    image: postgres:16-alpine
+    container_name: postgres-orders
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gallery_orders
+    volumes:
+      - pg_orders_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gallery-net
+
+# ──────────────────────────────────────
+# Volumes & Network
+# ──────────────────────────────────────
+volumes:
+  mysql_users_data:
+  pg_products_data:
+  pg_orders_data:
+  user_uploads:
+  product_uploads:
+
+networks:
+  gallery-net:
+    driver: bridge
