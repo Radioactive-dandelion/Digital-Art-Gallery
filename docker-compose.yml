@@ -77,7 +77,7 @@ services:
   # ──────────────────────────────────────
   frontend:
     build: ./frontend
-    container_name: frontend
+    container_name: digital-art-frontend
     ports:
       - "5173:80"
     depends_on:
