@@ -3,20 +3,20 @@ version: "3.9"
 services:
 
   # ──────────────────────────────────────
-  # USER SERVICE  (Node.js + Express)
+  # USER SERVICE  
   # ──────────────────────────────────────
   user-service:
-    build: ./user-service/server
+    build: ./user-service
     container_name: user-service
     ports:
       - "8081:8081"
     environment:
       DB_HOST: mysql-users
       DB_USER: root
-      DB_PASSWORD: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       DB_NAME: gallery_users
-      JWT_SECRET: change-me-in-production
-      INTERNAL_SECRET: internal-secret
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
       NODE_ENV: production
     depends_on:
       mysql-users:
@@ -28,7 +28,7 @@ services:
       - gallery-net
 
   # ──────────────────────────────────────
-  # PRODUCT SERVICE  (Python + FastAPI)
+  # PRODUCT SERVICE  
   # ──────────────────────────────────────
   product-service:
     build: ./product-service
@@ -36,12 +36,9 @@ services:
     ports:
       - "8082:8082"
     environment:
-      DB_HOST: postgres-products
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: gallery_products
-      JWT_SECRET: change-me-in-production
-      INTERNAL_SECRET: internal-secret
+      DATABASE_URL: postgresql+psycopg2://postgres:${POSTGRES_PASSWORD}@postgres-products:5432/gallery_products
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
       USER_SERVICE_URL: http://user-service:8081
     depends_on:
       postgres-products:
@@ -53,7 +50,7 @@ services:
       - gallery-net
 
   # ──────────────────────────────────────
-  # ORDER SERVICE  (Java + Spring Boot)
+  # ORDER SERVICE  
   # ──────────────────────────────────────
   order-service:
     build: ./order-service
@@ -61,12 +58,11 @@ services:
     ports:
       - "8083:8083"
     environment:
-      DB_HOST: postgres-orders
+      DB_URL: jdbc:postgresql://postgres-orders:5432/gallery_orders
       DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: gallery_orders
-      JWT_SECRET: change-me-in-production
-      INTERNAL_SECRET: internal-secret
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
       USER_SERVICE_URL: http://user-service:8081
       PRODUCT_SERVICE_URL: http://product-service:8082
     depends_on:
@@ -77,17 +73,13 @@ services:
       - gallery-net
 
   # ──────────────────────────────────────
-  # FRONTEND  (React + Vite)
+  # FRONTEND  
   # ──────────────────────────────────────
   frontend:
     build: ./frontend
     container_name: frontend
     ports:
       - "5173:80"
-    environment:
-      VITE_USER_SERVICE_URL: http://localhost:8081
-      VITE_PRODUCT_SERVICE_URL: http://localhost:8082
-      VITE_ORDER_SERVICE_URL: http://localhost:8083
     depends_on:
       - user-service
       - product-service
@@ -97,19 +89,19 @@ services:
       - gallery-net
 
   # ──────────────────────────────────────
-  # MySQL — для User Service
+  # MySQL 
   # ──────────────────────────────────────
   mysql-users:
     image: mysql:8.0
     container_name: mysql-users
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: gallery_users
     volumes:
       - mysql_users_data:/var/lib/mysql
-      - ./user-service/server/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./user-service/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -117,14 +109,14 @@ services:
       - gallery-net
 
   # ──────────────────────────────────────
-  # PostgreSQL — для Product Service
+  # PostgreSQL 
   # ──────────────────────────────────────
   postgres-products:
     image: postgres:16-alpine
     container_name: postgres-products
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: gallery_products
     volumes:
       - pg_products_data:/var/lib/postgresql/data
@@ -137,14 +129,14 @@ services:
       - gallery-net
 
   # ──────────────────────────────────────
-  # PostgreSQL — для Order Service
+  # PostgreSQL 
   # ──────────────────────────────────────
   postgres-orders:
     image: postgres:16-alpine
     container_name: postgres-orders
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: gallery_orders
     volumes:
       - pg_orders_data:/var/lib/postgresql/data

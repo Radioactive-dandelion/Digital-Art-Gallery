@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 -- ──────────────────────────────────────────
 -- Начальный admin-аккаунт
--- password: admin123  (поменяй после первого входа)
 -- ──────────────────────────────────────────
 INSERT IGNORE INTO users (name, email, password, role)
 VALUES (
