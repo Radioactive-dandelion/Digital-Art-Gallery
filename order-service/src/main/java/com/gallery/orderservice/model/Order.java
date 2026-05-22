@@ -1,9 +1,6 @@
 package com.gallery.orderservice.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -11,8 +8,6 @@ import java.util.List;
 
 @Entity
 @Table(name = "orders")
-@Data
-@NoArgsConstructor
 public class Order {
 
     @Id
@@ -42,7 +37,6 @@ public class Order {
     @Column(name = "payment_method")
     private String paymentMethod;
 
-    // Адрес доставки — отдельные поля для удобства фронта
     @Column(name = "shipping_full_name")
     private String shippingFullName;
 
@@ -96,4 +90,38 @@ public class Order {
                 .map(OrderItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+
+    // Getters and Setters
+    public Long getId()                              { return id; }
+    public void setId(Long id)                       { this.id = id; }
+    public Long getUserId()                          { return userId; }
+    public void setUserId(Long userId)               { this.userId = userId; }
+    public String getUserName()                      { return userName; }
+    public void setUserName(String userName)         { this.userName = userName; }
+    public List<OrderItem> getOrderItems()           { return orderItems; }
+    public void setOrderItems(List<OrderItem> items) { this.orderItems = items; }
+    public BigDecimal getTotalAmount()               { return totalAmount; }
+    public void setTotalAmount(BigDecimal v)         { this.totalAmount = v; }
+    public OrderStatus getOrderStatus()              { return orderStatus; }
+    public void setOrderStatus(OrderStatus v)        { this.orderStatus = v; }
+    public PaymentStatus getPaymentStatus()          { return paymentStatus; }
+    public void setPaymentStatus(PaymentStatus v)    { this.paymentStatus = v; }
+    public String getPaymentMethod()                 { return paymentMethod; }
+    public void setPaymentMethod(String v)           { this.paymentMethod = v; }
+    public String getShippingFullName()              { return shippingFullName; }
+    public void setShippingFullName(String v)        { this.shippingFullName = v; }
+    public String getShippingAddress()               { return shippingAddress; }
+    public void setShippingAddress(String v)         { this.shippingAddress = v; }
+    public String getShippingCity()                  { return shippingCity; }
+    public void setShippingCity(String v)            { this.shippingCity = v; }
+    public String getShippingCountry()               { return shippingCountry; }
+    public void setShippingCountry(String v)         { this.shippingCountry = v; }
+    public String getShippingZip()                   { return shippingZip; }
+    public void setShippingZip(String v)             { this.shippingZip = v; }
+    public LocalDateTime getCreatedAt()              { return createdAt; }
+    public void setCreatedAt(LocalDateTime v)        { this.createdAt = v; }
+    public LocalDateTime getUpdatedAt()              { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime v)        { this.updatedAt = v; }
+    public LocalDateTime getCompletedAt()            { return completedAt; }
+    public void setCompletedAt(LocalDateTime v)      { this.completedAt = v; }
 }

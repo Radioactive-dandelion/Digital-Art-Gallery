@@ -98,6 +98,17 @@ function Register() {
               className='form-control'
             />
           </div>
+          <div className='mb-3'>
+          <label><strong>I am a...</strong></label>
+          <select
+          className='form-control'
+          value={values.role}
+          onChange={e => setValues({ ...values, role: e.target.value })}
+          >
+          <option value='buyer'>Buyer - I want to purchase art</option>
+          <option value='artist'>Artist - I want to sell my work</option>
+          </select>
+          </div>
 
           <button
             type='submit'
