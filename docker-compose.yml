@@ -13,7 +13,7 @@ services:
     environment:
       DB_HOST: mysql-users
       DB_USER: root
-      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      DB_PASSWORD: ""
       DB_NAME: gallery_users
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_SECRET: ${INTERNAL_SECRET}
@@ -95,13 +95,13 @@ services:
     image: mysql:8.0
     container_name: mysql-users
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
       MYSQL_DATABASE: gallery_users
     volumes:
       - mysql_users_data:/var/lib/mysql
       - ./user-service/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -109,7 +109,7 @@ services:
       - gallery-net
 
   # ──────────────────────────────────────
-  # PostgreSQL 
+  # PostgreSQL
   # ──────────────────────────────────────
   postgres-products:
     image: postgres:16-alpine
