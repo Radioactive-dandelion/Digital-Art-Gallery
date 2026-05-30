@@ -1,16 +1,29 @@
 package com.gallery.orderservice.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 
-/** Универсальный DTO для корзины, вишлиста и позиций заказа. */
 public class CartItemDTO {
 
+    @JsonProperty("product_id")
     private Long productId;
+
+    @JsonProperty("title")
     private String title;
+
+    @JsonProperty("artist")
     private String artist;
+
+    @JsonProperty("image")
     private String image;
+
+    @JsonProperty("price")
     private BigDecimal price;
+
+    @JsonProperty("quantity")
     private Integer quantity;
+
+    @JsonProperty("subtotal")
     private BigDecimal subtotal;
 
     // Getters / Setters

@@ -27,23 +27,27 @@ public class JwtFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
+                System.out.println(">>> JwtFilter called: " + request.getMethod() + " " + request.getRequestURI() + " | Auth: " + request.getHeader("Authorization"));
 
-        String token = extractTokenFromCookie(request);
+        // 1. Сначала пробуем Authorization header (Bearer token)
+        String token = extractFromHeader(request);
+
+        // 2. Если нет — пробуем cookie
+        if (token == null) {
+            token = extractFromCookie(request);
+        }
 
         if (token != null && jwtUtil.isValid(token)) {
             Long userId   = jwtUtil.getUserId(token);
             String role   = jwtUtil.getRole(token);
             String name   = jwtUtil.getUserName(token);
 
-            // Кладём userId, role, name в атрибуты запроса — для контроллеров
-            request.setAttribute("userId", userId);
+            request.setAttribute("userId",   userId);
             request.setAttribute("userRole", role);
             request.setAttribute("userName", name);
 
-            // Устанавливаем аутентификацию в Spring Security context
             var auth = new UsernamePasswordAuthenticationToken(
-                    userId,
-                    null,
+                    userId, null,
                     List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
             );
             SecurityContextHolder.getContext().setAuthentication(auth);
@@ -52,7 +56,15 @@ public class JwtFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String extractTokenFromCookie(HttpServletRequest request) {
+    private String extractFromHeader(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
+    }
+
+    private String extractFromCookie(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) return null;
         return Arrays.stream(cookies)

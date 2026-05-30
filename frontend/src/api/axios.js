@@ -1,27 +1,36 @@
 import axios from 'axios'
 
-const config = {
-  headers: { 'Content-Type': 'application/json' },
-  withCredentials: true,
+// Общий interceptor — добавляет Bearer token из localStorage
+const addAuthHeader = (config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`
+  }
+  return config
 }
 
-// User Service — аутентификация, профиль
+// User Service
 export const userApi = axios.create({
   baseURL: import.meta.env.VITE_USER_SERVICE_URL || 'http://localhost:8081',
-  ...config,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // оставляем для cookie logout
 })
+userApi.interceptors.request.use(addAuthHeader)
 
-// Product Service — галерея, загрузка работ
+// Product Service
 export const productApi = axios.create({
   baseURL: import.meta.env.VITE_PRODUCT_SERVICE_URL || 'http://localhost:8082',
-  ...config,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: false,
 })
+productApi.interceptors.request.use(addAuthHeader)
 
-// Order Service — корзина, заказы, вишлист
+// Order Service
 export const orderApi = axios.create({
   baseURL: import.meta.env.VITE_ORDER_SERVICE_URL || 'http://localhost:8083',
-  ...config,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: false,
 })
+orderApi.interceptors.request.use(addAuthHeader)
 
-// Дефолтный экспорт для обратной совместимости (старые файлы которые ещё не обновлены)
 export default userApi

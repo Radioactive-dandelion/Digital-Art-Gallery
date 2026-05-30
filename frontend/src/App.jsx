@@ -1,19 +1,18 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 import ProtectedRoute from './components/ProtectedRoute'
-
-// Auth / User
-import Home          from './pages/Home'
-import Login         from './pages/auth/Login'
-import Register      from './pages/auth/Register'
-import Profile       from './pages/auth/Profile'
 
 // Gallery / Product
 import Gallery       from './pages/gallery/Gallery'
 import ArtworkDetail from './pages/gallery/ArtworkDetail'
 import ArtistsList   from './pages/gallery/ArtistsList'
 import NotFound      from './pages/gallery/NotFound'
+
+// Auth / User
+import Login         from './pages/auth/Login'
+import Register      from './pages/auth/Register'
+import Profile       from './pages/auth/Profile'
 
 // Orders
 import Wishlist      from './pages/orders/Wishlist'
@@ -34,7 +33,7 @@ import AdminDashboard  from './pages/admin/AdminDashboard'
 import ManageUsers     from './pages/admin/ManageUsers'
 import ManageProducts  from './pages/admin/ManageProducts'
 
-const ALL_ROLES   = ['buyer', 'artist', 'admin']
+const ALL_ROLES    = ['buyer', 'artist', 'admin']
 const ARTIST_ADMIN = ['artist', 'admin']
 
 function App() {
@@ -42,8 +41,10 @@ function App() {
     <BrowserRouter>
       <Routes>
 
+        {/* / → /gallery */}
+        <Route path='/' element={<Navigate to='/gallery' replace />} />
+
         {/* ── Public ── */}
-        <Route path='/'              element={<Home />} />
         <Route path='/login'         element={<Login />} />
         <Route path='/register'      element={<Register />} />
         <Route path='/gallery'       element={<Gallery />} />
